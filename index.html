@@ -1,0 +1,1472 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>Brick Quest — Refo Games</title>
+<meta name="description" content="Açıyı ayarla, topu fırlat, tuğlaları kır! Brick Quest — ücretsiz, tarayıcıda anında oynanan tuğla kırma oyunu.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Russo+One&family=Rubik:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-0:#0a0c18;
+    --bg-1:#11142a;
+    --ink:#eef1ff;
+    --ink-dim:#8d93b8;
+    --neon-blue:#3ec1ff;
+    --neon-pink:#ff3ec4;
+    --neon-amber:#ffc93c;
+    --neon-green:#3effa1;
+    --neon-red:#ff5470;
+    --line:rgba(255,255,255,.08);
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  html,body{
+    margin:0; padding:0; height:100%; overflow:hidden;
+    background:var(--bg-0);
+    font-family:'Rubik',-apple-system,BlinkMacSystemFont,sans-serif;
+    color:var(--ink);
+    touch-action:none;
+    user-select:none;
+  }
+  #app{
+    position:fixed; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    background:
+      radial-gradient(circle at 50% -10%, rgba(62,193,255,.18), transparent 55%),
+      radial-gradient(circle at 90% 110%, rgba(255,62,196,.14), transparent 50%),
+      var(--bg-0);
+  }
+  #stage{
+    position:relative;
+    width:100%; height:100%;
+    max-width:520px;
+    display:flex; flex-direction:column;
+  }
+
+  /* ---------- HUD ---------- */
+  #hud{
+    position:relative; z-index:5;
+    display:flex; align-items:center; justify-content:space-between;
+    padding:max(10px, env(safe-area-inset-top)) 12px 8px;
+    gap:6px;
+  }
+  .hud-pill{
+    display:flex; align-items:center; gap:5px;
+    background:rgba(255,255,255,.05);
+    border:1px solid var(--line);
+    border-radius:999px;
+    padding:6px 10px;
+    font-size:12px; font-weight:600;
+    color:var(--ink-dim);
+    backdrop-filter: blur(6px);
+    white-space:nowrap;
+  }
+  .hud-pill b{
+    font-family:'Russo One', sans-serif;
+    color:var(--ink);
+    font-size:14px;
+    letter-spacing:.2px;
+  }
+  .hud-pill.score b{ color:var(--neon-amber); }
+  .hud-pill.level b{ color:var(--neon-blue); }
+  #bestPill b{ color:var(--neon-amber); }
+  .icon-btn{
+    width:32px; height:32px; border-radius:50%;
+    background:rgba(255,255,255,.05);
+    border:1px solid var(--line);
+    display:flex; align-items:center; justify-content:center;
+    font-size:14px; cursor:pointer; flex:none;
+  }
+  .hud-right{ display:flex; gap:5px; align-items:center; }
+
+  /* ---------- canvas area ---------- */
+  #gameWrap{
+    position:relative; flex:1; min-height:0;
+  }
+  canvas{
+    position:absolute; inset:0;
+    width:100%; height:100%;
+    display:block;
+    touch-action:none;
+  }
+
+  /* ---------- combo / floaters handled in canvas ---------- */
+
+  /* ---------- overlays ---------- */
+  .overlay{
+    position:absolute; inset:0; z-index:20;
+    display:flex; align-items:center; justify-content:center;
+    background:rgba(8,9,18,.72);
+    backdrop-filter: blur(10px) saturate(120%);
+    opacity:0; pointer-events:none;
+    transition:opacity .25s ease;
+  }
+  .overlay.show{ opacity:1; pointer-events:auto; }
+  .panel{
+    width:min(86%, 360px);
+    text-align:center;
+    display:flex; flex-direction:column; align-items:center; gap:14px;
+    transform:translateY(10px) scale(.97);
+    transition:transform .3s ease;
+  }
+  .overlay.show .panel{ transform:translateY(0) scale(1); }
+
+  .logo{
+    font-family:'Russo One', sans-serif;
+    font-size:42px; line-height:1.02;
+    letter-spacing:1px;
+    color:var(--ink);
+    text-shadow:0 0 18px rgba(62,193,255,.55), 0 0 40px rgba(255,62,196,.25);
+    margin:0;
+  }
+  .logo span{ color:var(--neon-pink); }
+  .subtitle{
+    color:var(--ink-dim); font-size:13.5px; margin:-6px 0 4px; max-width:280px;
+  }
+  .by-line{
+    color:var(--ink-dim); font-size:11px; letter-spacing:.5px; text-transform:uppercase;
+    margin-top:-2px;
+  }
+
+  .btn{
+    appearance:none; border:none; cursor:pointer;
+    font-family:'Russo One', sans-serif;
+    font-size:17px; letter-spacing:.5px;
+    color:#06080f;
+    padding:14px 38px;
+    border-radius:16px;
+    background:linear-gradient(135deg,var(--neon-blue),var(--neon-pink));
+    box-shadow:0 8px 24px rgba(62,193,255,.35), 0 0 0 1px rgba(255,255,255,.15) inset;
+    transition:transform .12s ease, box-shadow .12s ease;
+  }
+  .btn:active{ transform:scale(.95); }
+  .btn.ghost{
+    background:rgba(255,255,255,.06);
+    color:var(--ink);
+    box-shadow:0 0 0 1px var(--line) inset;
+    font-size:14px; padding:10px 26px;
+  }
+
+  .lang-row{ display:flex; gap:8px; margin-top:6px; }
+  .lang-btn{
+    background:rgba(255,255,255,.05);
+    border:1px solid var(--line);
+    color:var(--ink-dim);
+    font-size:12px; font-weight:600;
+    padding:6px 12px; border-radius:999px; cursor:pointer;
+  }
+  .lang-btn.active{ color:var(--ink); border-color:var(--neon-blue); background:rgba(62,193,255,.12); }
+
+  .stat-row{
+    display:flex; gap:10px; width:100%;
+  }
+  .stat-box{
+    flex:1;
+    background:rgba(255,255,255,.05);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:12px 6px;
+  }
+  .stat-box .num{
+    font-family:'Russo One', sans-serif;
+    font-size:22px;
+  }
+  .stat-box .lbl{
+    font-size:11px; color:var(--ink-dim); margin-top:2px; text-transform:uppercase; letter-spacing:.4px;
+  }
+  .stat-box.gold .num{ color:var(--neon-amber); }
+  .stat-box.blue .num{ color:var(--neon-blue); }
+  .stat-box.green .num{ color:var(--neon-green); }
+
+  .go-title{
+    font-family:'Russo One', sans-serif;
+    font-size:30px;
+    color:var(--neon-red);
+    text-shadow:0 0 18px rgba(255,84,112,.5);
+    margin:0;
+  }
+
+  .new-best{
+    font-size:12px; color:var(--neon-amber); font-weight:700;
+    letter-spacing:.4px; text-transform:uppercase;
+    opacity:0;
+  }
+  .new-best.show{ opacity:1; }
+
+  .toast{
+    position:absolute; top:14%; left:50%; transform:translateX(-50%);
+    font-family:'Russo One', sans-serif;
+    font-size:15px; color:var(--neon-green);
+    text-shadow:0 0 10px rgba(62,255,161,.6);
+    opacity:0; pointer-events:none; z-index:8;
+    transition:opacity .2s ease, transform .2s ease;
+  }
+  .toast.show{ opacity:1; transform:translateX(-50%) translateY(-8px); }
+
+  .pause-row{ position:absolute; top:0; right:0; }
+
+  @media (max-height: 620px){
+    .logo{ font-size:32px; }
+    .go-title{ font-size:24px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+
+    <div id="hud">
+      <div class="hud-pill score"><span data-i18n="hudScore">SKOR</span> <b id="scoreVal">0</b></div>
+      <div class="hud-right">
+        <div class="hud-pill level" id="bestPill">★ <b id="bestVal">0</b></div>
+        <div class="hud-pill level">LV <b id="levelVal">1</b></div>
+        <div class="icon-btn" id="soundBtn">🔊</div>
+        <div class="icon-btn" id="pauseBtn">⏸</div>
+      </div>
+    </div>
+
+    <div id="gameWrap">
+      <canvas id="canvas"></canvas>
+      <div class="toast" id="toast"></div>
+    </div>
+
+    <!-- START OVERLAY -->
+    <div class="overlay show" id="startOverlay">
+      <div class="panel">
+        <h1 class="logo">BRICK<br><span>QUEST</span></h1>
+        <p class="subtitle" data-i18n="subtitle">Açıyı ayarla, fırlat, tüm tuğlaları kır. Her atışta bir top daha kazanırsın!</p>
+        <button class="btn" id="playBtn" data-i18n="play">OYNA</button>
+        <div class="lang-row">
+          <button class="lang-btn active" data-lang="tr">🇹🇷 Türkçe</button>
+          <button class="lang-btn" data-lang="en">🇬🇧 English</button>
+        </div>
+        <div class="by-line">by Refo Games</div>
+      </div>
+    </div>
+
+    <!-- PAUSE OVERLAY -->
+    <div class="overlay" id="pauseOverlay">
+      <div class="panel">
+        <h1 class="logo" style="font-size:30px;" data-i18n="paused">DURAKLATILDI</h1>
+        <button class="btn" id="resumeBtn" data-i18n="resume">DEVAM ET</button>
+        <button class="btn ghost" id="menuFromPauseBtn" data-i18n="menu">MENÜ</button>
+      </div>
+    </div>
+
+    <!-- GAME OVER OVERLAY -->
+    <div class="overlay" id="overOverlay">
+      <div class="panel">
+        <h2 class="go-title" data-i18n="gameover">OYUN BİTTİ</h2>
+        <div class="new-best" id="newBest" data-i18n="newbest">YENİ REKOR!</div>
+        <div class="stat-row">
+          <div class="stat-box gold">
+            <div class="num" id="finalScore">0</div>
+            <div class="lbl" data-i18n="score">Skor</div>
+          </div>
+          <div class="stat-box blue">
+            <div class="num" id="finalBest">0</div>
+            <div class="lbl" data-i18n="best">En Yüksek</div>
+          </div>
+          <div class="stat-box green">
+            <div class="num" id="finalLevel">1</div>
+            <div class="lbl" data-i18n="level">Seviye</div>
+          </div>
+        </div>
+        <button class="btn" id="retryBtn" data-i18n="retry">TEKRAR</button>
+        <button class="btn ghost" id="menuBtn" data-i18n="menu">MENÜ</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+/* ============================================================
+   BRICK QUEST — by Refo Games
+   Bricks-Breaker-Quest-style aim & launch brick breaker.
+   ============================================================ */
+
+/* ---------------- i18n ---------------- */
+const I18N = {
+  tr:{
+    subtitle:"Açıyı ayarla, fırlat, tüm tuğlaları kır. Her atışta bir top daha kazanırsın!",
+    play:"OYNA", paused:"DURAKLATILDI", resume:"DEVAM ET", menu:"MENÜ",
+    gameover:"OYUN BİTTİ", newbest:"YENİ REKOR!", score:"Skor", best:"En Yüksek",
+    level:"Seviye", retry:"TEKRAR", levelUp:"SEVİYE {n}!", ballPlus:"+1 TOP!",
+    boom:"💣 PATLADI!", boardClear:"✨ TAHta TEMİZ!", ballBonus:"+3 🔵 TOP BONUS",
+    hudScore:"SKOR", hudBest:"★", hudLevel:"LV", powerShot:"⚡ GÜÇ ATIŞI x2!",
+    boardClearWords:["SÜPER!","MÜKEMMEL!","MUHTEŞEM!","OLAĞANÜSTÜ!"]
+  },
+  en:{
+    subtitle:"Aim, launch, break every brick. Each shot earns you one more ball!",
+    play:"PLAY", paused:"PAUSED", resume:"RESUME", menu:"MENU",
+    gameover:"GAME OVER", newbest:"NEW BEST!", score:"Score", best:"Best",
+    level:"Level", retry:"RETRY", levelUp:"LEVEL {n}!", ballPlus:"+1 BALL!",
+    boom:"💣 BOOM!", boardClear:"✨ BOARD CLEAR!", ballBonus:"+3 🔵 BALL BONUS",
+    hudScore:"SCORE", hudBest:"★", hudLevel:"LV", powerShot:"⚡ POWER SHOT x2!",
+    boardClearWords:["SUPER!","PERFECT!","AMAZING!","INCREDIBLE!"]
+  }
+};
+let lang = localStorage.getItem('bq_lang') || 'tr';
+
+function applyI18n(){
+  document.querySelectorAll('[data-i18n]').forEach(el=>{
+    const key = el.getAttribute('data-i18n');
+    if(I18N[lang][key]) el.textContent = I18N[lang][key];
+  });
+  document.querySelectorAll('.lang-btn').forEach(b=>{
+    b.classList.toggle('active', b.dataset.lang === lang);
+  });
+  // HUD labels (contain dynamic <b> children so we update the text node only)
+  const scoreLabel = document.querySelector('.hud-pill.score');
+  if(scoreLabel){
+    scoreLabel.childNodes[0].textContent = I18N[lang].hudScore + ' ';
+  }
+}
+document.querySelectorAll('.lang-btn').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    lang = b.dataset.lang;
+    localStorage.setItem('bq_lang', lang);
+    applyI18n();
+  });
+});
+
+/* ---------------- sound (WebAudio, no assets) ---------------- */
+let soundOn = localStorage.getItem('bq_sound') !== 'off';
+let actx = null;
+function ensureAudio(){
+  if(!actx){ actx = new (window.AudioContext||window.webkitAudioContext)(); }
+  if(actx.state === 'suspended') actx.resume();
+}
+function beep(freq, dur, type='sine', vol=.08, delay=0){
+  if(!soundOn) return;
+  ensureAudio();
+  const t0 = actx.currentTime + delay;
+  const osc = actx.createOscillator();
+  const gain = actx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, t0);
+  gain.gain.setValueAtTime(vol, t0);
+  gain.gain.exponentialRampToValueAtTime(0.001, t0 + dur);
+  osc.connect(gain); gain.connect(actx.destination);
+  osc.start(t0); osc.stop(t0 + dur);
+}
+const sfx = {
+  launch:()=>beep(520,.08,'triangle',.06),
+  hit:(pitch=1)=>beep(300*pitch,.06,'square',.05),
+  brickBreak:()=>{ beep(660,.07,'square',.07); beep(880,.08,'square',.05,.03); },
+  wallHit:()=>beep(220,.04,'sine',.03),
+  land:()=>beep(160,.08,'sine',.04),
+  levelUp:()=>{ beep(523,.09,'triangle',.08); beep(659,.09,'triangle',.08,.09); beep(784,.14,'triangle',.09,.18); },
+  ballPlus:()=>{ beep(700,.06,'sine',.06); beep(900,.08,'sine',.05,.05); },
+  gameOver:()=>{ beep(300,.15,'sawtooth',.08); beep(220,.18,'sawtooth',.07,.12); beep(140,.25,'sawtooth',.07,.24); },
+  bomb:()=>{ beep(80,.35,'sawtooth',.15); beep(55,.4,'sawtooth',.12,.05); beep(140,.18,'square',.08,.02); },
+  boardClear:()=>{
+    // triumphant arpeggio
+    [523,659,784,1047].forEach((f,i)=>beep(f,.15,'triangle',.1,i*0.09));
+    beep(1568,.3,'sine',.12,.4);
+  },
+  // tiered board-clear fanfares — bigger/richer the higher the tier
+  boardClearTier:(tier)=>{
+    if(tier===0){
+      // SÜPER — short bright triad
+      [659,880,1175].forEach((f,i)=>beep(f,.13,'triangle',.09,i*0.07));
+    } else if(tier===1){
+      // MÜKEMMEL — fuller rising arpeggio
+      [523,659,784,1047].forEach((f,i)=>beep(f,.15,'triangle',.1,i*0.08));
+      beep(1568,.25,'sine',.1,.36);
+    } else if(tier===2){
+      // MUHTEŞEM — double-layered fanfare
+      [392,523,659,784,1047,1319].forEach((f,i)=>beep(f,.16,'triangle',.1,i*0.07));
+      beep(1568,.35,'sine',.13,.5);
+      beep(2093,.3,'sine',.08,.55);
+    } else {
+      // OLAĞANÜSTÜ — epic cascading fanfare
+      [330,392,523,659,784,1047,1319,1568].forEach((f,i)=>beep(f,.18,'triangle',.11,i*0.06));
+      beep(2093,.4,'sine',.14,.6);
+      beep(2637,.4,'sine',.1,.68);
+      beep(110,.5,'sawtooth',.08,.05);
+    }
+  },
+  combo:(n)=>{
+    const f = 300 + Math.min(n,10)*60;
+    beep(f,.07,'square',.06); beep(f*1.5,.05,'sine',.04,.05);
+  },
+  streak:()=>{ beep(880,.08,'triangle',.07); beep(1100,.1,'triangle',.08,.06); beep(1320,.12,'triangle',.09,.13); }
+};
+
+const soundBtn = document.getElementById('soundBtn');
+soundBtn.textContent = soundOn ? '🔊' : '🔇';
+soundBtn.addEventListener('click', ()=>{
+  soundOn = !soundOn;
+  localStorage.setItem('bq_sound', soundOn ? 'on' : 'off');
+  soundBtn.textContent = soundOn ? '🔊' : '🔇';
+});
+
+/* ---------------- canvas & sizing ---------------- */
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const gameWrap = document.getElementById('gameWrap');
+let W = 0, H = 0, DPR = Math.min(window.devicePixelRatio || 1, 2.5);
+
+function resize(){
+  const rect = gameWrap.getBoundingClientRect();
+  const oldW = W;
+  W = rect.width; H = rect.height;
+  canvas.width = Math.floor(W * DPR);
+  canvas.height = Math.floor(H * DPR);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  // Dynamically match TOP_MARGIN to actual HUD height so bricks start right below it
+  const hud = document.getElementById('hud');
+  TOP_MARGIN = hud ? hud.getBoundingClientRect().height + 6 : 54;
+  // If the board width actually changed (e.g. rotation, mobile toolbar resize),
+  // realign every existing brick to the new grid using its stored column index,
+  // otherwise bricks drift off the grid and look scattered/misaligned.
+  if(oldW && Math.abs(W - oldW) > 0.5 && typeof bricks !== 'undefined'){
+    const newBw = brickWidth();
+    for(const b of bricks){
+      if(typeof b.col === 'number'){
+        b.x = BRICK_GAP + b.col*(newBw+BRICK_GAP);
+        b.w = newBw;
+      }
+    }
+  }
+}
+window.addEventListener('resize', resize);
+
+/* ---------------- game constants ---------------- */
+const COLS = 7;
+let TOP_MARGIN = 90;        // space below HUD reserved for bricks grid top — recalculated on resize
+const LAUNCH_Y_RATIO = 0.92;  // launcher sits near bottom
+const BALL_R = 6.5;
+const BALL_SPEED_BASE = 760;  // base px/sec — scales up after level 10
+function ballSpeed(){ return level < 10 ? BALL_SPEED_BASE : Math.min(1050, BALL_SPEED_BASE + (level-10)*10); }
+const BRICK_H = 38;
+const BRICK_GAP = 6;
+const MAX_AIM_ANGLE = 80 * Math.PI/180; // from vertical, each side
+
+const BRICK_PALETTE = [
+  ['#3ec1ff','#1a7fc4'], // blue
+  ['#ff3ec4','#b32090'], // pink
+  ['#ffc93c','#cf9a1a'], // amber
+  ['#3effa1','#1fbd75'], // green
+  ['#ff5470','#c9344f'], // red
+  ['#9d6bff','#6c43cf'], // purple
+];
+
+/* ---------------- state ---------------- */
+let state = 'menu'; // menu | aiming | launching | over | paused
+let level = 1;
+let score = 0;
+let best = parseInt(localStorage.getItem('bq_best')||'0',10);
+let ballsToFire = 0;         // remaining balls queued to fire this shot
+let fireTimer = 0;
+let launcherX = 0;
+let aimAngle = 0;            // radians from straight-up, +right
+let bricks = [];             // {x,y,w,h,hp,maxHp,colorIdx,alive,isBonus}
+let balls = [];              // active flying balls
+let particles = [];
+let floaters = [];           // floating text
+let screenFlash = 0;         // white flash on bomb
+let screenFlashColor = '#ffffff';
+let shockwaves = [];         // [{x,y,r,maxR,life}]
+let comboCount = 0;          // bricks broken in one shot
+let comboPeak = 0;
+let boardClearAnim = 0;      // 0-1 rainbow pulse when board is cleared
+let bgPulse = 0;             // quick bg color flash on good events
+let rowsAdvanced = 0;
+let powerShotsRemaining = 0;       // toplar bu kadar atış boyunca çift hasar verir
+let powerShotAwardedForLevel = new Set(); // her level eşiği için bonus bir kez verilsin
+let pointerDown = false;
+let lastTime = 0;
+let stars = [];
+
+/* background starfield (ambient, cheap) */
+function initStars(){
+  stars = [];
+  for(let i=0;i<46;i++){
+    stars.push({
+      x: Math.random(), y: Math.random(),
+      r: Math.random()*1.4+.3,
+      a: Math.random()*.5+.15,
+      tw: Math.random()*2+1
+    });
+  }
+}
+
+/* ---------------- brick grid generation ---------------- */
+function brickWidth(){
+  return (W - BRICK_GAP*(COLS+1)) / COLS;
+}
+
+function spawnRow(y, forcedHp){
+  const bw = brickWidth();
+  let bombInRow = false; // her satırda en fazla 1 bomba
+  // Levels 1-4 are a deliberate warm-up but still keep the board reasonably
+  // full — too sparse and the ball-count snowball clears every row down to
+  // almost nothing by the time level 5 hits, which makes the "step up" land
+  // on an empty board instead of a real one. From level 5 on, both density
+  // and brick toughness ramp up noticeably faster than before.
+  const fillProb = level < 5
+    ? Math.min(0.75, 0.55 + (level-1)*0.05)
+    : level < 10
+      ? Math.min(0.92, 0.72 + (level-5)*0.026)
+      : Math.min(0.97, 0.92 + (level-10)*0.005); // level 10+: kademeli doluluk
+  const minHp = level < 5
+    ? 1
+    : level < 10
+      ? 3 + Math.floor((level - 5) * 0.85)
+      : level < 20
+        ? 6 + Math.floor((level - 10) * 0.9)  // level 10-19: makul artış (eskisi 8 + 2.2x idi)
+        : 15 + Math.floor((level - 20) * 2.0); // level 20+: belirgin şekilde daha zor (15 = level19'dan devam)
+  const maxHp = level < 5
+    ? 2 + Math.floor((level-1) * 0.6)
+    : level < 10
+      ? minHp + 4 + Math.floor((level - 5) * 0.55)
+      : level < 20
+        ? minHp + 4 + Math.floor((level - 10) * 1.0)  // level 10-19: daha dar HP aralığı
+        : minHp + 14 + Math.floor((level - 20) * 1.1); // level 20+: hem taban hem aralık büyüyor (14 = level19 aralığından devam)
+  for(let c=0;c<COLS;c++){
+    if(Math.random() > fillProb) continue;
+    const hp = forcedHp || (minHp + Math.floor(Math.random()*(maxHp-minHp+1)));
+    const isBonus = Math.random() < 0.05;
+    // Bomba: level 3'ten önce yok, kenardaki sütunlarda yok (c=0 veya c=COLS-1),
+    // her satırda en fazla 1 bomba (bombInRow flag ile kontrol edilir),
+    // level arttıkça olasılık hafifçe artar ama %10'u geçmez
+    const bombChance = level < 3 ? 0 : Math.min(0.10, 0.03 + (level-3)*0.005);
+    const edgeCol = (c === 0 || c === COLS-1);
+    const isBomb  = !isBonus && !edgeCol && !bombInRow && Math.random() < bombChance;
+    if(isBomb) bombInRow = true;
+    bricks.push({
+      x: BRICK_GAP + c*(bw+BRICK_GAP),
+      y: y,
+      col: c,
+      w: bw, h: BRICK_H,
+      hp: (isBonus || isBomb) ? 1 : hp,
+      maxHp: (isBonus || isBomb) ? 1 : hp,
+      colorIdx: isBonus ? -1 : isBomb ? -2 : (hp-1) % BRICK_PALETTE.length,
+      alive:true,
+      pendingDead:false,
+      isBonus,
+      isBomb,
+      hitFlash:0,
+      shakeT:0
+    });
+  }
+}
+
+function startLevel(n){
+  level = n;
+  bricks = [];
+  balls = [];
+  particles = [];
+  floaters = [];
+  const rows = 4;
+  for(let r=0;r<rows;r++){
+    spawnRow(TOP_MARGIN + r*(BRICK_H+BRICK_GAP));
+  }
+  launcherX = W/2;
+  aimAngle = 0;
+  document.getElementById('levelVal').textContent = level;
+}
+
+/* persistent ball count across the whole run (classic BBQ mechanic) */
+let runBallCount = 2;
+
+function newRun(){
+  score = 0;
+  runBallCount = 2; // starting with 2 instead of 1 smooths out early-game luck swings
+  level = 1;
+  rowsAdvanced = 0;
+  powerShotsRemaining = 0;
+  powerShotAwardedForLevel.clear();
+  updateScoreUI();
+  startLevel(1);
+}
+
+function launcherY(){ return H * LAUNCH_Y_RATIO; }
+
+/* The danger line must sit exactly on a brick-row boundary, otherwise rows
+   visually drift out of sync with it (a row can look like it's already past
+   the line while the game hasn't registered a loss yet, or vice versa).
+   We find the largest grid line (TOP_MARGIN + n*rowStep) that still leaves
+   a little clearance above the launcher, and use that as the danger line. */
+function dangerY(){
+  const rowStep = BRICK_H + BRICK_GAP;
+  const maxY = launcherY() - 30; // keep some clearance above the launcher itself
+  const rowsFit = Math.floor((maxY - TOP_MARGIN) / rowStep);
+  return TOP_MARGIN + rowsFit * rowStep;
+}
+
+/* ---------------- UI helpers ---------------- */
+function updateScoreUI(){
+  document.getElementById('scoreVal').textContent = score;
+  document.getElementById('bestVal').textContent = Math.max(best, score);
+}
+
+let toastTimer = null;
+function showToast(text){
+  const el = document.getElementById('toast');
+  el.textContent = text;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> el.classList.remove('show'), 900);
+}
+
+/* ---------------- input: aiming ---------------- */
+function clientToLocal(clientX, clientY){
+  const rect = gameWrap.getBoundingClientRect();
+  return { x: clientX - rect.left, y: clientY - rect.top };
+}
+
+function setAimFromPoint(px, py){
+  const lx = launcherX, ly = launcherY();
+  let dx = px - lx;
+  let dy = ly - py; // invert so "up" is positive
+  if(dy < 40) dy = 40; // prevent aiming downward/sideways too flat
+  let angle = Math.atan2(dx, dy);
+  angle = Math.max(-MAX_AIM_ANGLE, Math.min(MAX_AIM_ANGLE, angle));
+  aimAngle = angle;
+}
+
+function onPointerDown(e){
+  if(state !== 'aiming') return;
+  pointerDown = true;
+  const p = pointFromEvent(e);
+  setAimFromPoint(p.x, p.y);
+}
+function onPointerMove(e){
+  if(!pointerDown || state !== 'aiming') return;
+  const p = pointFromEvent(e);
+  setAimFromPoint(p.x, p.y);
+}
+function onPointerUp(e){
+  if(!pointerDown) return;
+  pointerDown = false;
+  if(state === 'aiming'){
+    fireBalls();
+  }
+}
+function pointFromEvent(e){
+  if(e.touches && e.touches.length) return clientToLocal(e.touches[0].clientX, e.touches[0].clientY);
+  if(e.changedTouches && e.changedTouches.length) return clientToLocal(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+  return clientToLocal(e.clientX, e.clientY);
+}
+
+canvas.addEventListener('mousedown', onPointerDown);
+canvas.addEventListener('mousemove', onPointerMove);
+window.addEventListener('mouseup', onPointerUp);
+canvas.addEventListener('touchstart', (e)=>{ onPointerDown(e); }, {passive:true});
+canvas.addEventListener('touchmove', (e)=>{ onPointerMove(e); }, {passive:true});
+canvas.addEventListener('touchend', (e)=>{ onPointerUp(e); }, {passive:true});
+
+/* ---------------- firing ---------------- */
+function fireBalls(){
+  state = 'launching';
+  ballsToFire = runBallCount;
+  fireTimer = 0;
+  sfx.launch();
+  spawnNextBall();
+}
+
+function spawnNextBall(){
+  if(ballsToFire <= 0) return;
+  ballsToFire--;
+  const dx = Math.sin(aimAngle);
+  const dy = -Math.cos(aimAngle);
+  const spd = ballSpeed();
+  balls.push({
+    x: launcherX, y: launcherY()-10,
+    vx: dx*spd, vy: dy*spd,
+    trail:[],
+    landed:false,
+    lastHitBrick:null
+  });
+}
+
+/* ---------------- physics & collision ---------------- */
+function stepBalls(dt){
+  // staggered launch: fire next ball shortly after previous
+  if(ballsToFire > 0){
+    fireTimer += dt;
+    if(fireTimer > 0.06){
+      fireTimer = 0;
+      spawnNextBall();
+    }
+  }
+
+  let anyAlive = false;
+  for(const ball of balls){
+    if(ball.landed) continue;
+    anyAlive = true;
+    // Sub-step by distance, not just a fixed count: at high speed or after a frame
+    // hiccup the ball could otherwise travel farther than a brick is thick in one
+    // step and pass straight through it (tunneling). Capping each step to a few
+    // pixels guarantees we never skip past something solid.
+    const maxStepPx = 4;
+    const totalDist = Math.hypot(ball.vx, ball.vy) * dt;
+    const steps = Math.max(2, Math.min(40, Math.ceil(totalDist / maxStepPx)));
+    let stopped = false;
+    for(let s=0;s<steps && !stopped;s++){
+      const sdt = dt/steps;
+      const prevX = ball.x, prevY = ball.y;
+      ball.x += ball.vx*sdt;
+      ball.y += ball.vy*sdt;
+
+      // walls
+      if(ball.x - BALL_R < 0){ ball.x = BALL_R; ball.vx *= -1; sfx.wallHit(); }
+      if(ball.x + BALL_R > W){ ball.x = W-BALL_R; ball.vx *= -1; sfx.wallHit(); }
+      if(ball.y - BALL_R < 0){ ball.y = BALL_R; ball.vy *= -1; sfx.wallHit(); }
+
+      // once the ball has actually moved clear of the brick it last hit, allow
+      // it to be hit again later (e.g. a genuine second pass after bouncing
+      // around the board) — this only blocks *immediate* repeat hits.
+      if(ball.lastHitBrick && !ball.lastHitBrick.alive){
+        ball.lastHitBrick = null;
+      } else if(ball.lastHitBrick){
+        const lb = ball.lastHitBrick;
+        const clear = ball.x + BALL_R < lb.x - 1 || ball.x - BALL_R > lb.x + lb.w + 1 ||
+                      ball.y + BALL_R < lb.y - 1 || ball.y - BALL_R > lb.y + lb.h + 1;
+        if(clear) ball.lastHitBrick = null;
+      }
+
+      // brick collisions — checked against the swept segment (prev -> current),
+      // not just the ball's endpoint, so a brick can't be skipped over.
+      // Guard: skip the brick we *just* bounced off this same flight, so a ball
+      // resting at a glancing angle on an edge can't be counted as multiple hits
+      // before it has actually separated from the brick.
+      // Note: bricks marked pendingDead (killed earlier THIS SAME FRAME by another
+      // ball) are still treated as solid here — only fully-dead (b.alive===false)
+      // bricks are skipped. This prevents a second ball from sailing straight
+      // through a brick that a different ball killed moments earlier in the
+      // same frame, which is especially likely with 20-30+ balls in flight at
+      // higher levels.
+      // Where two bricks meet at a tight corner (brick gap is smaller than the
+      // ball's diameter, so the ball can straddle two bricks' edges at once),
+      // picking whichever brick happens to come first in array order could
+      // resolve against the "wrong" one and shove the ball sideways into the
+      // neighboring brick's slot instead of bouncing it cleanly off the corner.
+      // Instead, gather every brick the swept segment actually intersects this
+      // substep and resolve against the one with the smallest true overlap —
+      // that's the one actually hit first.
+      let hitB = null, hitOverlap = Infinity, hitAxis = null;
+      for(const b of bricks){
+        if(!b.alive) continue;
+        if(b === ball.lastHitBrick) continue;
+        if(!segmentHitsBrick(prevX, prevY, ball.x, ball.y, BALL_R, b)) continue;
+        const overlapL = (ball.x+BALL_R) - b.x;
+        const overlapR = (b.x+b.w) - (ball.x-BALL_R);
+        const overlapT = (ball.y+BALL_R) - b.y;
+        const overlapB = (b.y+b.h) - (ball.y-BALL_R);
+        const minOverlap = Math.min(overlapL,overlapR,overlapT,overlapB);
+        if(minOverlap < hitOverlap){
+          hitOverlap = minOverlap;
+          hitB = b;
+          hitAxis = (minOverlap === overlapT) ? 'T' : (minOverlap === overlapB) ? 'B' : (minOverlap === overlapL) ? 'L' : 'R';
+        }
+      }
+      if(hitB){
+        const b = hitB;
+        if(hitAxis === 'T' || hitAxis === 'B'){
+          ball.vy *= -1;
+          ball.y = (hitAxis === 'T') ? b.y - BALL_R - 0.1 : b.y + b.h + BALL_R + 0.1;
+        } else {
+          ball.vx *= -1;
+          ball.x = (hitAxis === 'L') ? b.x - BALL_R - 0.1 : b.x + b.w + BALL_R + 0.1;
+        }
+        ball.lastHitBrick = b;
+        // Only register a hit (damage/score/effects) if the brick wasn't
+        // already killed by another ball earlier this same frame — it still
+        // bounces the ball (handled above) but shouldn't be hit twice.
+        if(!b.pendingDead) hitBrick(b, ball);
+      }
+
+      // floor: ball "lands" — stack at bottom near launcher area
+      if(ball.y - BALL_R > launcherY()+6){
+        ball.landed = true;
+        ball.finalX = Math.max(BALL_R, Math.min(W-BALL_R, ball.x));
+        sfx.land();
+        stopped = true;
+      }
+    }
+    ball.trail.push({x:ball.x,y:ball.y});
+    if(ball.trail.length > 8) ball.trail.shift();
+  }
+
+  // Now that every ball's substeps for this frame are done, actually remove
+  // bricks that were killed during this frame. Doing this here (rather than
+  // inside hitBrick) ensures every ball got a fair, solid collision against
+  // the brick for the full frame it died in.
+  for(const b of bricks){
+    if(b.pendingDead){ b.alive = false; }
+  }
+
+  if(!anyAlive && ballsToFire === 0 && balls.length > 0){
+    finishShot();
+  }
+}
+
+/* Does the moving ball (segment from prev->cur, radius r) intersect this brick's
+   rectangle? Tested by expanding the rect by the ball radius and checking the
+   segment against it, which catches fast-moving balls that would otherwise
+   tunnel through on a single endpoint-only check. */
+function segmentHitsBrick(x0,y0,x1,y1,r,b){
+  const minX = b.x - r, maxX = b.x + b.w + r;
+  const minY = b.y - r, maxY = b.y + b.h + r;
+  // quick reject via segment bounding box
+  if(Math.max(x0,x1) < minX || Math.min(x0,x1) > maxX) return false;
+  if(Math.max(y0,y1) < minY || Math.min(y0,y1) > maxY) return false;
+  // endpoint already inside expanded rect -> definite hit
+  if(x1 >= minX && x1 <= maxX && y1 >= minY && y1 <= maxY) return true;
+  if(x0 >= minX && x0 <= maxX && y0 >= minY && y0 <= maxY) return true;
+  // liang-barsky segment vs AABB
+  const dx = x1-x0, dy = y1-y0;
+  let tMin = 0, tMax = 1;
+  for(const [p, d, lo, hi] of [[x0,dx,minX,maxX],[y0,dy,minY,maxY]]){
+    if(d === 0){
+      if(p < lo || p > hi) return false;
+    } else {
+      let t1 = (lo-p)/d, t2 = (hi-p)/d;
+      if(t1 > t2){ const tmp=t1; t1=t2; t2=tmp; }
+      tMin = Math.max(tMin, t1);
+      tMax = Math.min(tMax, t2);
+      if(tMin > tMax) return false;
+    }
+  }
+  return true;
+}
+
+function hitBrick(b, ball){
+  const dmg = powerShotsRemaining > 0 ? 2 : 1;
+  b.hp -= dmg;
+  b.hitFlash = 1;
+  b.shakeT = 0.12;
+  sfx.hit(1 + (b.maxHp-b.hp)*0.05);
+  spawnParticles(ball.x, ball.y, BRICK_PALETTE[(b.colorIdx+BRICK_PALETTE.length)%BRICK_PALETTE.length] || ['#fff','#fff'], 5);
+  if(b.hp <= 0){
+    // Don't flip b.alive immediately: with many balls in flight (high
+    // runBallCount at later levels) another ball can be mid-flight through
+    // this exact brick in the same frame. If we mark it dead right away,
+    // that other ball's collision loop skips it (`if(!b.alive) continue`)
+    // and passes straight through — visible as "the ball went through a
+    // block". Instead flag it pendingDead; it still blocks collisions for
+    // the rest of this frame and is only removed at the end of stepBalls.
+    b.pendingDead = true;
+    comboCount++;
+    score += 10 * level;
+    updateScoreUI();
+    spawnParticles(b.x+b.w/2, b.y+b.h/2, b.isBonus ? ['#ffc93c','#cf9a1a'] : (BRICK_PALETTE[(b.colorIdx+BRICK_PALETTE.length)%BRICK_PALETTE.length]||['#fff','#fff']), 14);
+    sfx.brickBreak();
+    // Combo milestone shockwave + sound
+    if(comboCount > 0 && comboCount % 5 === 0){
+      spawnShockwave(b.x+b.w/2, b.y+b.h/2, 100, 'rgba(255,196,60,0.8)');
+      sfx.combo(comboCount);
+      if(comboCount % 10 === 0) sfx.streak();
+    }
+    if(b.isBomb){
+      explodeBomb(b);
+    } else if(b.isBonus){
+      runBallCount++;
+      showToast(I18N[lang].ballPlus);
+      sfx.ballPlus();
+      spawnFloater(b.x+b.w/2, b.y+b.h/2, '+1 🔵');
+      spawnShockwave(b.x+b.w/2, b.y+b.h/2, 80, 'rgba(62,193,255,0.9)');
+    } else {
+      const pts = 10*level;
+      const col = comboCount >= 10 ? '#ff3ec4' : comboCount >= 5 ? '#ffc93c' : '#3effa1';
+      spawnFloater(b.x+b.w/2, b.y+b.h/2, '+'+pts, col, comboCount>=5?16:13);
+    }
+  }
+}
+
+function spawnParticles(x,y,colors,n){
+  for(let i=0;i<n;i++){
+    const a = Math.random()*Math.PI*2;
+    const sp = 60+Math.random()*160;
+    particles.push({
+      x,y, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp,
+      life:1, maxLife: .4+Math.random()*.4,
+      color: colors[Math.random()<0.5?0:1],
+      r: 1.5+Math.random()*2.2
+    });
+  }
+}
+function spawnFloater(x,y,text,color,size){
+  floaters.push({x,y,text,life:1,color:color||'#ffc93c',size:size||13});
+}
+
+function spawnShockwave(x,y,maxR,color){
+  shockwaves.push({x,y,r:0,maxR:maxR||120,life:1,color:color||'rgba(62,193,255,0.7)'});
+}
+
+function spawnConfetti(cx,cy,n){
+  const cols=['#3ec1ff','#ff3ec4','#ffc93c','#3effa1','#ff5470','#ffffff','#9d6bff'];
+  for(let i=0;i<n;i++){
+    const a=Math.random()*Math.PI*2, sp=80+Math.random()*260;
+    particles.push({
+      x:cx,y:cy, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp - 60,
+      life:1, maxLife:.7+Math.random()*.6,
+      color:cols[Math.floor(Math.random()*cols.length)],
+      r:2.5+Math.random()*3.5,
+      spin:Math.random()>.5?1:-1,
+      square:Math.random()>.5
+    });
+  }
+}
+
+/* Bomb: destroys only the 4 immediate neighbor bricks (left, right, up, down) */
+function explodeBomb(bomb){
+  const bw = brickWidth();
+  const rowStep = BRICK_H + BRICK_GAP;
+  const colStep = bw + BRICK_GAP;
+  // Big shockwave particle burst
+  for(let i=0;i<60;i++){
+    const a = (i/60)*Math.PI*2;
+    const sp = 120 + Math.random()*320;
+    particles.push({
+      x: bomb.x+bomb.w/2, y: bomb.y+bomb.h/2,
+      vx: Math.cos(a)*sp, vy: Math.sin(a)*sp,
+      life:1, maxLife:.5+Math.random()*.4,
+      color: ['#ff5470','#ff3ec4','#ffc93c','#ffffff'][Math.floor(Math.random()*4)],
+      r: 2+Math.random()*4
+    });
+  }
+  // Screen-flash effect via temporary overlay rect (drawn once in canvas)
+  screenFlash = 1.0;
+  sfx.bomb();
+
+  // Find bomb's grid column and row by position
+  const bombCx = bomb.x + bomb.w/2;
+  const bombCy = bomb.y + bomb.h/2;
+
+  for(const b of bricks){
+    if(!b.alive || b === bomb) continue;
+    const bCx = b.x + b.w/2;
+    const bCy = b.y + b.h/2;
+    // only the 4 direct neighbors: one column left/right on same row, or one row up/down on same column
+    const isRight = Math.abs(bCy - bombCy) < BRICK_H * 0.6 && Math.abs(bCx - bombCx - colStep) < bw * 0.6;
+    const isLeft  = Math.abs(bCy - bombCy) < BRICK_H * 0.6 && Math.abs(bCx - bombCx + colStep) < bw * 0.6;
+    const isDown  = Math.abs(bCx - bombCx) < bw * 0.6 && Math.abs(bCy - bombCy - rowStep) < BRICK_H * 0.6;
+    const isUp    = Math.abs(bCx - bombCx) < bw * 0.6 && Math.abs(bCy - bombCy + rowStep) < BRICK_H * 0.6;
+    if(isRight || isLeft || isDown || isUp){
+      b.pendingDead = true;
+      b.hitFlash = 1;
+      score += 10 * level;
+      spawnParticles(b.x+b.w/2, b.y+b.h/2,
+        b.isBonus ? ['#ffc93c','#cf9a1a'] :
+        BRICK_PALETTE[(b.colorIdx+BRICK_PALETTE.length)%BRICK_PALETTE.length] || ['#fff','#fff'], 10);
+      spawnFloater(b.x+b.w/2, b.y+b.h/2, '💥');
+    }
+  }
+  updateScoreUI();
+  spawnFloater(bomb.x+bomb.w/2, bomb.y+bomb.h/2, I18N[lang].boom);
+}
+
+/* ---------------- shot resolution ---------------- */
+function finishShot(){
+  // determine resting x: average landed positions, fallback to launcherX
+  let avg = 0, n=0;
+  for(const ball of balls){ if(ball.finalX!=null){ avg+=ball.finalX; n++; } }
+  if(n>0) launcherX = Math.max(brickWidth()/2+6, Math.min(W-brickWidth()/2-6, avg/n));
+  balls = [];
+
+  // Loss must be checked AFTER rows advance, not before — otherwise a row that
+  // crosses the danger line on this very shot only gets caught on the *next*
+  // shot's check, leaving bricks visibly past the line for a full turn while
+  // the game keeps running.
+  const wasCleared = advanceRows();
+
+  const lost = bricks.some(b => b.alive && (b.y + b.h) >= dangerY());
+  if(lost){
+    endRun();
+    return;
+  }
+
+  // Board clear check — use the flag captured inside advanceRows() BEFORE the
+  // next row was spawned, since by this point a fresh row already exists.
+  if(wasCleared){
+    triggerBoardClear();
+  }
+
+  // Reset combo for next shot, record peak
+  comboPeak = Math.max(comboPeak, comboCount);
+  comboCount = 0;
+
+  // Power shot bonusu bu atışta kullanıldıysa bir azalt (atış başına 1 hak)
+  if(powerShotsRemaining > 0) powerShotsRemaining--;
+
+  state = 'aiming';
+}
+
+/* Board clear: massive reward + effects, escalating with level */
+function triggerBoardClear(){
+  const bonus = 500 * level;
+  score += bonus;
+  updateScoreUI();
+
+  // Pick a tier based on current level: higher levels -> grander word/effect.
+  // 0: SÜPER (early levels)  1: MÜKEMMEL  2: MUHTEŞEM  3: OLAĞANÜSTÜ (high levels)
+  let tier;
+  if(level < 6) tier = 0;
+  else if(level < 12) tier = 1;
+  else if(level < 20) tier = 2;
+  else tier = 3;
+
+  const tierColors = ['#3effa1', '#3ec1ff', '#ffc93c', '#ff3ec4'];
+  const tierSizes  = [22, 26, 30, 36];
+  const color = tierColors[tier];
+  const word = I18N[lang].boardClearWords[tier];
+
+  boardClearAnim = 1.0 + tier*0.4;
+  bgPulse = 1.0;
+  screenFlash = 1.0;
+  screenFlashColor = color;
+
+  // Confetti & shockwave intensity scales with tier
+  const bursts = 8 + tier*4;
+  const confettiPerBurst = 18 + tier*8;
+  for(let i=0;i<bursts;i++){
+    setTimeout(()=>{
+      spawnConfetti(Math.random()*W, Math.random()*H*0.7, confettiPerBurst);
+      spawnShockwave(W/2, H/2, 200+Math.random()*100+tier*30, `hsl(${Math.random()*360},100%,70%)`);
+    }, i*70);
+  }
+  // Extra big shockwave ring centered on the word for higher tiers
+  if(tier >= 1){
+    spawnShockwave(W/2, H*0.35, 140+tier*40, color);
+  }
+  if(tier >= 2){
+    setTimeout(()=> spawnShockwave(W/2, H*0.35, 180+tier*40, color), 150);
+  }
+
+  spawnFloater(W/2, H*0.35, word, color, tierSizes[tier]);
+  spawnFloater(W/2, H*0.35 + tierSizes[tier]*1.1, '+'+bonus, '#ffc93c', 18);
+  showToast(word);
+  sfx.boardClearTier(tier);
+}
+
+/* push all bricks down one row and add a fresh row at top — called between shots */
+function advanceRows(){
+  // drop dead bricks so the array doesn't grow forever (perf)
+  bricks = bricks.filter(b => b.alive);
+  // move existing bricks down
+  for(const b of bricks){
+    b.y += (BRICK_H+BRICK_GAP);
+  }
+
+  // Capture "fully cleared" BEFORE a fresh row gets spawned below — otherwise
+  // the board never appears empty by the time finishShot checks it.
+  const wasCleared = bricks.length === 0;
+
+  // If this advance alone would already cross the danger line, don't bother
+  // spawning yet another fresh row or firing the level-up fanfare — the run
+  // is about to end and that just adds visual noise to a board the player
+  // won't get to play anyway.
+  const aboutToLose = bricks.some(b => b.alive && (b.y + b.h) >= dangerY());
+  if(aboutToLose) return wasCleared;
+
+  spawnRow(TOP_MARGIN);
+  rowsAdvanced++;
+  // Ball count grows by exactly +1 every time the player reaches a new level
+  // (not per shot) — a clear, predictable reward tied to actual progress.
+  // Bonus bricks (+1) still grant an immediate, uncapped extra ball on top of
+  // this, rewarding good aim independently of level progress.
+  if(rowsAdvanced % 3 === 0){
+    level++;
+    runBallCount++;
+    document.getElementById('levelVal').textContent = level;
+    showToast(I18N[lang].levelUp.replace('{n}', level));
+    sfx.levelUp();
+
+    // Telafi mekaniği: her 5 levelde bir (15, 20, 25...) oyuncuya "POWER SHOT"
+    // bonusu — sonraki 2 atış boyunca toplar çift hasar verir. Artan satır
+    // baskısına karşı oyuncuya elle hissedilir bir güç artışı sağlar.
+    if(level >= 15 && level % 5 === 0 && !powerShotAwardedForLevel.has(level)){
+      powerShotAwardedForLevel.add(level);
+      powerShotsRemaining += 2;
+      runBallCount += 2; // ekstra telafi: top sayısı da artsın
+      setTimeout(()=> showToast(I18N[lang].powerShot), 650);
+      sfx.levelUp();
+    }
+  }
+
+  // NOT: önceden level 13+ için ekstra satır(lar) ekleniyordu (bazı seviyelerde
+  // bir atışta 2 satır birden inip ani kayıplara sebep oluyordu — örn. en alt
+  // satırın çizgiye 2 satır kalmışken bir atışta 2 satır inmesi). Artık HER
+  // ZAMAN tam olarak 1 satır iniyor, seviye ne olursa olsun. Zorluk artışı
+  // sadece spawnRow() içindeki doluluk/HP parametreleriyle sağlanıyor.
+  return wasCleared;
+}
+
+/* ---------------- game over / best ---------------- */
+function endRun(){
+  state = 'over';
+  sfx.gameOver();
+  const isNew = score > best;
+  if(isNew){ best = score; localStorage.setItem('bq_best', String(best)); }
+  document.getElementById('finalScore').textContent = score;
+  document.getElementById('finalBest').textContent = best;
+  document.getElementById('finalLevel').textContent = level;
+  document.getElementById('newBest').classList.toggle('show', isNew);
+  showOverlay('overOverlay');
+}
+
+/* ---------------- overlay control ---------------- */
+function showOverlay(id){
+  document.querySelectorAll('.overlay').forEach(o=>o.classList.remove('show'));
+  document.getElementById(id).classList.add('show');
+}
+function hideOverlays(){
+  document.querySelectorAll('.overlay').forEach(o=>o.classList.remove('show'));
+}
+
+document.getElementById('playBtn').addEventListener('click', ()=>{
+  ensureAudio();
+  hideOverlays();
+  rowsAdvanced = 0;
+  newRun();
+  state = 'aiming';
+});
+document.getElementById('retryBtn').addEventListener('click', ()=>{
+  hideOverlays();
+  rowsAdvanced = 0;
+  newRun();
+  state = 'aiming';
+});
+document.getElementById('menuBtn').addEventListener('click', ()=>{
+  showOverlay('startOverlay');
+  state = 'menu';
+});
+document.getElementById('menuFromPauseBtn').addEventListener('click', ()=>{
+  showOverlay('startOverlay');
+  state = 'menu';
+});
+document.getElementById('pauseBtn').addEventListener('click', ()=>{
+  if(state==='aiming' || state==='launching'){
+    prevStateBeforePause = state;
+    state = 'paused';
+    showOverlay('pauseOverlay');
+  }
+});
+let prevStateBeforePause = 'aiming';
+document.getElementById('resumeBtn').addEventListener('click', ()=>{
+  hideOverlays();
+  state = prevStateBeforePause;
+});
+
+/* ---------------- render ---------------- */
+function drawBackgroundStars(){
+  ctx.save();
+  for(const s of stars){
+    const tw = 0.55 + 0.45*Math.sin(performance.now()/1000*s.tw + s.x*10);
+    ctx.globalAlpha = s.a*tw;
+    ctx.fillStyle = '#bcd4ff';
+    ctx.beginPath();
+    ctx.arc(s.x*W, s.y*H, s.r, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function roundRect(x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);
+  ctx.arcTo(x+w,y,x+w,y+h,r);
+  ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r);
+  ctx.arcTo(x,y,x+w,y,r);
+  ctx.closePath();
+}
+
+function drawBricks(){
+  for(const b of bricks){
+    if(!b.alive) continue;
+    const shakeX = b.shakeT>0 ? (Math.random()-0.5)*4*b.shakeT*8 : 0;
+    const [c1,c2] = b.isBomb ? ['#ff2200','#880000'] : b.isBonus ? ['#ffe27a','#ffc93c'] : BRICK_PALETTE[(b.colorIdx+BRICK_PALETTE.length)%BRICK_PALETTE.length];
+    const x = b.x+shakeX, y = b.y;
+
+    ctx.save();
+    if(b.hitFlash>0){
+      ctx.shadowColor = c1;
+      ctx.shadowBlur = 18*b.hitFlash;
+    } else {
+      ctx.shadowColor = c1;
+      ctx.shadowBlur = 6;
+    }
+    const grad = ctx.createLinearGradient(x,y,x,y+b.h);
+    grad.addColorStop(0, c1);
+    grad.addColorStop(1, c2);
+    ctx.fillStyle = grad;
+    roundRect(x,y,b.w,b.h,9);
+    ctx.fill();
+    ctx.restore();
+
+    // inner highlight
+    ctx.save();
+    ctx.globalAlpha = .22;
+    ctx.fillStyle = '#ffffff';
+    roundRect(x+3,y+3,b.w-6,b.h*0.38,6);
+    ctx.fill();
+    ctx.restore();
+
+    // text
+    ctx.save();
+    ctx.fillStyle = 'rgba(8,9,18,.85)';
+    ctx.font = "700 16px 'Russo One', sans-serif";
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    if(b.isBomb){
+      ctx.font = "18px sans-serif";
+      ctx.fillText('💣', x+b.w/2, y+b.h/2+1);
+    } else if(b.isBonus){
+      ctx.font = "16px sans-serif";
+      ctx.fillText('🔵+1', x+b.w/2, y+b.h/2+1);
+    } else {
+      ctx.fillText(String(b.hp), x+b.w/2, y+b.h/2+1);
+    }
+    ctx.restore();
+
+    b.hitFlash = Math.max(0, b.hitFlash - 0.08);
+    b.shakeT = Math.max(0, b.shakeT - 0.02);
+  }
+}
+
+function drawDangerLine(){
+  const y = dangerY();
+  ctx.save();
+  ctx.setLineDash([6,6]);
+  ctx.strokeStyle = 'rgba(255,84,112,.35)';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(0,y); ctx.lineTo(W,y);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawAimGuide(){
+  if(state !== 'aiming' && !(state==='paused' && prevStateBeforePause==='aiming')) return;
+  const lx = launcherX, ly = launcherY();
+  let dx = Math.sin(aimAngle), dy = -Math.cos(aimAngle);
+  let x = lx, y = ly, vx = dx, vy = dy;
+  const dots = [];
+  let steps = 0;
+  while(steps < 80){
+    x += vx*8; y += vy*8;
+    if(x<0){x=0; vx*=-1;} if(x>W){x=W; vx*=-1;}
+    if(y < 0) break;
+    let blocked=false;
+    for(const b of bricks){
+      if(!b.alive) continue;
+      if(x>=b.x && x<=b.x+b.w && y>=b.y && y<=b.y+b.h){ blocked=true; break; }
+    }
+    dots.push({x,y});
+    if(blocked) break;
+    steps++;
+  }
+  ctx.save();
+  for(let i=0;i<dots.length;i++){
+    ctx.globalAlpha = 0.55 * (1 - i/dots.length);
+    ctx.fillStyle = '#3ec1ff';
+    ctx.beginPath();
+    ctx.arc(dots[i].x, dots[i].y, 2.6, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawLauncher(){
+  const lx = launcherX, ly = launcherY();
+  ctx.save();
+  // launcher base
+  const grad = ctx.createLinearGradient(lx-22,ly,lx+22,ly+14);
+  grad.addColorStop(0,'#3ec1ff');
+  grad.addColorStop(1,'#ff3ec4');
+  ctx.fillStyle = grad;
+  ctx.shadowColor = '#3ec1ff';
+  ctx.shadowBlur = 12;
+  roundRect(lx-22, ly, 44, 14, 7);
+  ctx.fill();
+  ctx.restore();
+
+  // waiting balls count indicator
+  ctx.save();
+  ctx.fillStyle = '#eef1ff';
+  ctx.font = "700 12px 'Russo One', sans-serif";
+  ctx.textAlign='center';
+  ctx.fillText('x'+runBallCount, lx, ly+30);
+  ctx.restore();
+
+  // power shot indicator — active bonus shown above the launcher
+  if(powerShotsRemaining > 0){
+    ctx.save();
+    ctx.fillStyle = '#ffc93c';
+    ctx.shadowColor = '#ffc93c';
+    ctx.shadowBlur = 10;
+    ctx.font = "700 13px 'Russo One', sans-serif";
+    ctx.textAlign='center';
+    ctx.fillText('⚡x2 ('+powerShotsRemaining+')', lx, ly-12);
+    ctx.restore();
+  }
+}
+
+function drawBalls(){
+  for(const ball of balls){
+    if(ball.landed) continue;
+    // trail
+    for(let i=0;i<ball.trail.length;i++){
+      const t = ball.trail[i];
+      ctx.save();
+      ctx.globalAlpha = (i/ball.trail.length)*0.35;
+      ctx.fillStyle = '#3ec1ff';
+      ctx.beginPath();
+      ctx.arc(t.x,t.y,BALL_R*0.8,0,Math.PI*2);
+      ctx.fill();
+      ctx.restore();
+    }
+    ctx.save();
+    ctx.shadowColor = '#ffffff';
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, BALL_R, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+  // landed stack preview (small dots near launcher)
+  let landedCount = balls.filter(b=>b.landed).length;
+  for(let i=0;i<landedCount;i++){
+    ctx.save();
+    ctx.globalAlpha = .6;
+    ctx.fillStyle = '#3ec1ff';
+    ctx.beginPath();
+    ctx.arc(launcherX - 10 + (i%6)*4, launcherY()+18+Math.floor(i/6)*6, 3, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
+function drawParticles(dt){
+  for(let i=particles.length-1;i>=0;i--){
+    const p = particles[i];
+    p.x += p.vx*dt; p.y += p.vy*dt;
+    p.vy += 260*dt;
+    p.life -= dt/p.maxLife;
+    if(p.life<=0){ particles.splice(i,1); continue; }
+    ctx.save();
+    ctx.globalAlpha = Math.max(0,p.life);
+    ctx.fillStyle = p.color;
+    if(p.square){
+      ctx.translate(p.x,p.y);
+      ctx.rotate(p.life * p.spin * Math.PI * 3);
+      ctx.fillRect(-p.r,-p.r,p.r*2,p.r*2);
+    } else {
+      ctx.beginPath();
+      ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+}
+
+function drawFloaters(dt){
+  for(let i=floaters.length-1;i>=0;i--){
+    const f = floaters[i];
+    f.y -= 55*dt;
+    f.life -= dt/1.0;
+    if(f.life<=0){ floaters.splice(i,1); continue; }
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, f.life > 0.3 ? f.life : f.life/0.3);
+    ctx.fillStyle = f.color || '#ffc93c';
+    const sz = f.size || 13;
+    ctx.font = `700 ${sz}px 'Russo One', sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.shadowColor = f.color || '#ffc93c';
+    ctx.shadowBlur = 8;
+    ctx.fillText(f.text, f.x, f.y);
+    ctx.restore();
+  }
+}
+
+/* Shockwave rings */
+function drawShockwaves(dt){
+  for(let i=shockwaves.length-1;i>=0;i--){
+    const s=shockwaves[i];
+    s.r += (s.maxR - s.r) * 8 * dt;
+    s.life -= dt / 0.5;
+    if(s.life<=0){ shockwaves.splice(i,1); continue; }
+    ctx.save();
+    ctx.globalAlpha = Math.max(0,s.life) * 0.8;
+    ctx.strokeStyle = s.color;
+    ctx.lineWidth = 3 * s.life;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI*2);
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
+/* ---------------- main loop ---------------- */
+function loop(ts){
+  requestAnimationFrame(loop);
+  if(!lastTime) lastTime = ts;
+  let dt = (ts - lastTime)/1000;
+  if(dt > 0.05) dt = 0.05; // clamp for tab-switch jumps
+  lastTime = ts;
+
+  ctx.clearRect(0,0,W,H);
+
+  // Board clear rainbow bg pulse
+  if(boardClearAnim > 0){
+    const hue = (performance.now()/6)%360;
+    ctx.save();
+    ctx.globalAlpha = boardClearAnim * 0.18;
+    ctx.fillStyle = `hsl(${hue},100%,60%)`;
+    ctx.fillRect(0,0,W,H);
+    ctx.restore();
+    boardClearAnim = Math.max(0, boardClearAnim - dt*0.55);
+  }
+
+  drawBackgroundStars();
+  drawShockwaves(dt);
+
+  // screen flash (bomb / board clear)
+  if(screenFlash > 0){
+    ctx.save();
+    ctx.globalAlpha = screenFlash * 0.42;
+    ctx.fillStyle = screenFlashColor;
+    ctx.fillRect(0,0,W,H);
+    ctx.restore();
+    screenFlash = Math.max(0, screenFlash - 0.07);
+  }
+
+  if(state !== 'menu'){
+    drawDangerLine();
+    drawBricks();
+    if(state === 'aiming') drawAimGuide();
+    drawLauncher();
+    drawBalls();
+  }
+
+  if(state === 'launching'){
+    stepBalls(dt);
+  }
+
+  drawParticles(dt);
+  drawFloaters(dt);
+}
+
+/* ---------------- boot ---------------- */
+function boot(){
+  resize();
+  initStars();
+  applyI18n();
+  updateScoreUI();
+  requestAnimationFrame(loop);
+}
+window.addEventListener('orientationchange', ()=> setTimeout(resize,200));
+boot();
+</script>
+</body>
+</html>
